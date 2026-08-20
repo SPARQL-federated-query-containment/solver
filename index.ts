@@ -5,6 +5,7 @@ import { locate } from "./lib/located_query";
 import { decideSetContainment } from "./lib/federated_containment";
 import { decideUcfqContainment } from "./lib/ucfq_containment";
 import { startSpecs } from "./lib/specs";
+import { assign } from "./lib/util_cli";
 
 program
   .description(
@@ -13,6 +14,14 @@ program
   .argument("<string>", "subquery")
   .argument("<string>", "superquery")
   .option("-c, --canonicalise", "decide on the canonical form of the queries")
+  .option(
+    "--federation-sub <members>",
+    "comma separated federation the subquery is evaluated over",
+  )
+  .option(
+    "--federation-super <members>",
+    "comma separated federation the superquery is evaluated over",
+  )
   .version("0.0.0");
 
 program.parse();
@@ -94,17 +103,37 @@ if (isError(superQueryResult)) {
   process.exit(2);
 }
 
+const options = program.opts<{
+  federationSub?: string;
+  federationSuper?: string;
+}>();
+
+const subFederated = assign(subQueryResult.value, options.federationSub);
+const superFederated = assign(superQueryResult.value, options.federationSuper);
+
+if (isError(subFederated)) {
+  await close();
+  console.error(`subquery: ${subFederated.error.message}`);
+  process.exit(2);
+}
+
+if (isError(superFederated)) {
+  await close();
+  console.error(`superquery: ${superFederated.error.message}`);
+  process.exit(2);
+}
+
 // A virtual member holds a BKG, so a pair holding one is decided under bag
 // semantics and any other under bag-set semantics.
 const decide =
-  subQueryResult.value.semantics === "bag" ||
-  superQueryResult.value.semantics === "bag"
+  subFederated.value.semantics === "bag" ||
+  superFederated.value.semantics === "bag"
     ? decideUcfqContainment
     : decideSetContainment;
 
 const containmentResult = await decide(
-  subQueryResult.value,
-  superQueryResult.value,
+  subFederated.value,
+  superFederated.value,
   specsResult.value.isContained,
 );
 
