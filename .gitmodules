@@ -1,0 +1,7 @@
+[submodule "QCan"]
+	path = qcan/QCan
+	url = git@github.com:RittoShadow/QCan.git
+[submodule "SpeCS"]
+	path = specs/SpeCS
+	url = git@github.com:constraintAutomaton/SpeCS.git
+	branch = fix/z3-path-from-env

@@ -1,0 +1,10 @@
+*
+!SpeCS/src
+!cli
+
+# Local build artifacts must not shadow the in-image build.
+SpeCS/src/specs
+SpeCS/src/*.o
+SpeCS/src/lex.yy.c
+SpeCS/src/parser.tab.*
+SpeCS/src/parser.output

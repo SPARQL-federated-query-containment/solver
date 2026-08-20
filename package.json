@@ -1,0 +1,29 @@
+{
+  "name": "implementation",
+  "module": "index.ts",
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@traqula/algebra-sparql-1-1": "^1.2.0",
+    "@traqula/algebra-transformations-1-1": "^1.2.0",
+    "@traqula/generator-sparql-1-1": "^1.2.0",
+    "@traqula/parser-sparql-1-1": "^1.2.0",
+    "commander": "^15.0.0",
+    "result-interface": "^2.3.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@rdfjs/types": "^2.0.1",
+    "@types/bun": "latest",
+    "eslint": "^10.8.1",
+    "rdf-data-factory": "^2.0.2",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.67.0"
+  },
+  "private": true,
+  "type": "module"
+}
