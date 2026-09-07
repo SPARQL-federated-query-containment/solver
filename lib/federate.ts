@@ -1,6 +1,5 @@
 import { type Result, result, error } from "result-interface";
-import { virtualMember } from "./bag_federation_reduction";
-import { LOCAL_MEMBER } from "./located_query";
+import { LOCAL_MEMBER, virtualMember } from "./federation_member";
 import type { LocatedQuery } from "./containment_mapping";
 
 /**

@@ -1,5 +1,5 @@
 {
-  "name": "implementation",
+  "name": "solver",
   "module": "index.ts",
   "scripts": {
     "test": "bun test",

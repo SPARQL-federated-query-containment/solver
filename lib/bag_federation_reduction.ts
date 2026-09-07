@@ -5,6 +5,7 @@ import {
   type LocatedBody,
   type LocatedTriplePattern,
 } from "./containment_mapping";
+import { virtualMember } from "./federation_member";
 
 export interface UnionBranch {
   member: string;
@@ -15,22 +16,6 @@ export interface UnionBranch {
 export type Slot =
   | { located: LocatedTriplePattern; branches?: undefined }
   | { located?: undefined; branches: [UnionBranch, ...UnionBranch[]] };
-
-/** The virtual member holding the BKG of a sub-federation. */
-export function virtualMember(subFederation: string[]): string {
-  const members = Array.from(new Set(subFederation)).sort();
-  const [only, ...rest] = members;
-
-  if (only !== undefined && rest.length === 0) {
-    return only;
-  }
-
-  const escaped = members.map((member) =>
-    encodeURIComponent(member).replaceAll("_", "%5F"),
-  );
-
-  return `urn:federation:${escaped.join("_")}`;
-}
 
 function patternVariables(
   pattern: Pick<LocatedTriplePattern, "subject" | "predicate" | "object">,

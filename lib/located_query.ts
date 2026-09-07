@@ -9,9 +9,7 @@ import {
   variablesOf,
   type LocatedQuery,
 } from "./containment_mapping";
-
-/** The member holding the knowledge graph queried locally, f_loc in the paper. */
-export const LOCAL_MEMBER = "urn:federation:local";
+import { LOCAL_MEMBER } from "./federation_member";
 
 type NodeCallBacks = Parameters<typeof algebraUtils.visitOperation>[1];
 

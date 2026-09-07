@@ -1,6 +1,7 @@
 import { test, expect } from "bun:test";
 import { isError, isResult } from "result-interface";
-import { locate, toSparql, LOCAL_MEMBER } from "../lib/located_query";
+import { locate, toSparql } from "../lib/located_query";
+import { LOCAL_MEMBER } from "../lib/federation_member";
 
 const PREFIX = "PREFIX ex: <http://example.org/>";
 const REGISTRY = "http://example.org/reg";
