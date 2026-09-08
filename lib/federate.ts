@@ -1,5 +1,5 @@
-import { type Result, result, error } from "result-interface";
-import { LOCAL_MEMBER, virtualMember } from "./federation_member";
+import { type Result, result, error, isError } from "result-interface";
+import { isLocal, subFederation } from "./federation_member";
 import type { LocatedQuery } from "./containment_mapping";
 
 /**
@@ -15,7 +15,7 @@ export function federate(
   }
 
   for (const pattern of query.body) {
-    if (pattern.location !== LOCAL_MEMBER) {
+    if (!isLocal(pattern.location)) {
       return error(
         new Error(
           "the query already reads at a federation member, so it cannot be assigned one",
@@ -24,11 +24,15 @@ export function federate(
     }
   }
 
-  const location = virtualMember(members);
+  const location = subFederation(members);
+
+  if (isError(location)) {
+    return location;
+  }
 
   return result({
     head: query.head,
-    body: query.body.map((pattern) => ({ ...pattern, location })),
-    semantics: location === members[0] ? "bag-set" : "bag",
+    body: query.body.map((pattern) => ({ ...pattern, location: location.value })),
+    semantics: location.value.size === 1 ? "bag-set" : "bag",
   });
 }

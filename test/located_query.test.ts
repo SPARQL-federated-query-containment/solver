@@ -14,7 +14,7 @@ function body(query: string) {
   }
 
   return form.value.body.map((pattern) => [
-    pattern.location,
+    [...pattern.location].sort(),
     pattern.subject.value,
     pattern.predicate.value,
     pattern.object.value,
@@ -39,7 +39,7 @@ function rejection(query: string) {
 
 test("locates a triple pattern of the body at the member queried locally", () => {
   expect(body("SELECT ?s WHERE { ?s ex:birthday ?b }")).toEqual([
-    [LOCAL_MEMBER, "s", "http://example.org/birthday", "b"],
+    [[LOCAL_MEMBER], "s", "http://example.org/birthday", "b"],
   ]);
 });
 
@@ -50,15 +50,15 @@ test("locates a triple pattern of a SERVICE clause at its endpoint", () => {
       SERVICE ex:reg { ?s ex:job ?j }
     }`),
   ).toEqual([
-    [LOCAL_MEMBER, "s", "http://example.org/birthday", "b"],
-    [REGISTRY, "s", "http://example.org/job", "j"],
+    [[LOCAL_MEMBER], "s", "http://example.org/birthday", "b"],
+    [[REGISTRY], "s", "http://example.org/job", "j"],
   ]);
 });
 
 test("reads a SERVICE clause wrapped in a group as an ordinary member", () => {
   expect(
     body("SELECT ?s ?j WHERE { { SERVICE ex:reg { ?s ex:job ?j } } }"),
-  ).toEqual([[REGISTRY, "s", "http://example.org/job", "j"]]);
+  ).toEqual([[[REGISTRY], "s", "http://example.org/job", "j"]]);
 });
 
 test("locates every pattern of a query spanning three members", () => {
@@ -78,28 +78,33 @@ test("locates every pattern of a query spanning three members", () => {
     }`),
   ).toEqual([
     [
-      LOCAL_MEMBER,
+      [LOCAL_MEMBER],
       "drug",
       "http://example.org/drugCategory",
       "http://example.org/micronutrient",
     ],
-    [LOCAL_MEMBER, "drug", "http://example.org/casRegistryNumber", "id"],
+    [[LOCAL_MEMBER], "drug", "http://example.org/casRegistryNumber", "id"],
     [
-      "http://example.org/kegg",
+      ["http://example.org/kegg"],
       "keggDrug",
       "http://example.org/chemicalFormula",
       "formula",
     ],
-    ["http://example.org/kegg", "keggDrug", "http://example.org/xRef", "id"],
-    ["http://example.org/kegg", "keggDrug", "http://example.org/url", "keggUrl"],
+    [["http://example.org/kegg"], "keggDrug", "http://example.org/xRef", "id"],
     [
-      "http://example.org/pubmed",
+      ["http://example.org/kegg"],
+      "keggDrug",
+      "http://example.org/url",
+      "keggUrl",
+    ],
+    [
+      ["http://example.org/pubmed"],
       "article",
       "http://example.org/subject",
       "drug",
     ],
     [
-      "http://example.org/pubmed",
+      ["http://example.org/pubmed"],
       "article",
       "http://example.org/title",
       "title",
@@ -114,10 +119,10 @@ test("gives two SERVICE clauses on one endpoint the same location", () => {
     SERVICE ex:reg { ?s ex:employer ?e }
   }`);
 
-  expect(located.map((pattern) => pattern[0]).toSorted()).toEqual([
-    REGISTRY,
-    REGISTRY,
-    LOCAL_MEMBER,
+  expect(located.map((pattern) => pattern[0])).toEqual([
+    [REGISTRY],
+    [LOCAL_MEMBER],
+    [REGISTRY],
   ]);
 });
 
@@ -171,8 +176,8 @@ test("takes every variable in scope as the head of a SELECT *", () => {
 
 test("expands a sequence path, which stays conjunctive", () => {
   expect(body("SELECT ?s WHERE { ?s ex:a/ex:b ?c }")).toEqual([
-    [LOCAL_MEMBER, "s", "http://example.org/a", "var0"],
-    [LOCAL_MEMBER, "var0", "http://example.org/b", "c"],
+    [[LOCAL_MEMBER], "s", "http://example.org/a", "var0"],
+    [[LOCAL_MEMBER], "var0", "http://example.org/b", "c"],
   ]);
 });
 

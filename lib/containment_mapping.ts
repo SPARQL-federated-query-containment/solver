@@ -1,8 +1,8 @@
 import type * as RDF from "@rdfjs/types";
 
-/** A triple pattern extended with the federation member evaluating it. */
+/** A triple pattern extended with the sub-federation evaluating it. */
 export interface LocatedTriplePattern {
-  location: string;
+  location: Set<string>;
   subject: RDF.Term;
   predicate: RDF.Term;
   object: RDF.Term;

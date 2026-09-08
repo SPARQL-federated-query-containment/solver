@@ -9,7 +9,7 @@ import {
   variablesOf,
   type LocatedQuery,
 } from "./containment_mapping";
-import { LOCAL_MEMBER } from "./federation_member";
+import { LOCAL_MEMBER, virtualMember } from "./federation_member";
 
 type NodeCallBacks = Parameters<typeof algebraUtils.visitOperation>[1];
 
@@ -82,7 +82,7 @@ export function locate(query: string): Result<LocatedQuery> {
 
             slots.push({
               located: {
-                location,
+                location: new Set([location]),
                 subject: pattern.subject,
                 predicate: pattern.predicate,
                 object: pattern.object,
@@ -219,7 +219,7 @@ function asPlainString(term: RDF.Term): RDF.Term {
  * that a solver deciding set containment can read it.
  */
 export function toSparql(query: LocatedQuery): string {
-  const patternsByLocation = new Map<string, Algebra.Pattern[]>();
+  const patternsByGraph = new Map<string, Algebra.Pattern[]>();
 
   for (const located of query.body) {
     const pattern = FACTORY.createPattern(
@@ -227,10 +227,11 @@ export function toSparql(query: LocatedQuery): string {
       located.predicate,
       asPlainString(located.object),
     );
-    const patterns = patternsByLocation.get(located.location);
+    const graph = virtualMember(located.location);
+    const patterns = patternsByGraph.get(graph);
 
     if (patterns === undefined) {
-      patternsByLocation.set(located.location, [pattern]);
+      patternsByGraph.set(graph, [pattern]);
     } else {
       patterns.push(pattern);
     }
@@ -238,11 +239,11 @@ export function toSparql(query: LocatedQuery): string {
 
   const graphs: Algebra.Operation[] = [];
 
-  for (const [location, patterns] of patternsByLocation) {
+  for (const [graph, patterns] of patternsByGraph) {
     graphs.push(
       FACTORY.createGraph(
         FACTORY.createBgp(patterns),
-        FACTORY.dataFactory.namedNode(location),
+        FACTORY.dataFactory.namedNode(graph),
       ),
     );
   }

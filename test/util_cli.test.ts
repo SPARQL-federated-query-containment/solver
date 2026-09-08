@@ -7,9 +7,7 @@ import { LOCAL_MEMBER } from "../lib/federation_member";
 const PREFIX = "PREFIX ex: <http://example.org/>";
 const REGISTRY = "http://example.org/reg";
 const NETWORK = "http://example.org/net";
-const BOTH =
-  "urn:federation:http%3A%2F%2Fexample.org%2Fnet" +
-  "_http%3A%2F%2Fexample.org%2Freg";
+const BOTH = [NETWORK, REGISTRY];
 
 function located(query: string) {
   const form = locate(`${PREFIX} ${query}`);
@@ -32,7 +30,7 @@ function assigned(query: string, federation: string | undefined) {
     head: federated.value.head.map((variable) => variable.value),
     semantics: federated.value.semantics,
     body: federated.value.body.map((pattern) => [
-      pattern.location,
+      [...pattern.location].sort(),
       pattern.subject.value,
       pattern.predicate.value,
       pattern.object.value,
@@ -64,7 +62,7 @@ test("leaves the query alone when no federation is given", () => {
   expect(assigned("SELECT ?s WHERE { ?s ex:job ?j }", undefined)).toEqual({
     head: ["s"],
     semantics: "bag-set",
-    body: [[LOCAL_MEMBER, "s", "http://example.org/job", "j"]],
+    body: [[[LOCAL_MEMBER], "s", "http://example.org/job", "j"]],
   });
 });
 

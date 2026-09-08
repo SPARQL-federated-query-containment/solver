@@ -1,11 +1,11 @@
 import { Algebra } from "@traqula/algebra-transformations-1-1";
-import { type Result, result, error } from "result-interface";
+import { type Result, result, error, isError } from "result-interface";
 import {
   POSITIONS,
   type LocatedBody,
   type LocatedTriplePattern,
 } from "./containment_mapping";
-import { virtualMember } from "./federation_member";
+import { subFederation } from "./federation_member";
 
 export interface UnionBranch {
   member: string;
@@ -148,11 +148,16 @@ export function reduce(
       members.push(branch.member);
     }
 
-    const member = virtualMember(members);
-    virtual ||= member !== members[0];
+    const location = subFederation(members);
+
+    if (isError(location)) {
+      return location;
+    }
+
+    virtual ||= location.value.size > 1;
 
     body.push({
-      location: member,
+      location: location.value,
       subject: reference.subject,
       predicate: reference.predicate,
       object: reference.object,

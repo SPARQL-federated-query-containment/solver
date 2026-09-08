@@ -8,7 +8,9 @@ export function federationOf(query: LocatedQuery): Set<string> {
   const federation = new Set<string>();
 
   for (const pattern of query.body) {
-    federation.add(pattern.location);
+    for (const member of pattern.location) {
+      federation.add(member);
+    }
   }
 
   return federation;
@@ -26,7 +28,7 @@ export function fresh(query: LocatedQuery, member: string): Set<string> {
   const elsewhere: LocatedTriplePattern[] = [];
 
   for (const pattern of query.body) {
-    if (pattern.location === member) {
+    if (pattern.location.has(member)) {
       atMember.push(pattern);
     } else {
       elsewhere.push(pattern);

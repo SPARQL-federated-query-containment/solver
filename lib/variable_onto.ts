@@ -6,6 +6,7 @@ import {
   type LocatedTriplePattern,
   type Mapping,
 } from "./containment_mapping";
+import { hosts } from "./federation_member";
 
 /** The variables a mapping reaches, by name. */
 function image(sigma: Mapping): Set<string> {
@@ -38,9 +39,7 @@ function search(
   }
 
   for (const b of targets) {
-    // A location is a constant, so a pattern is only ever placed on one
-    // evaluated at the same federation member.
-    if (b.location !== a.location) {
+    if (!hosts(a.location, b.location)) {
       continue;
     }
 

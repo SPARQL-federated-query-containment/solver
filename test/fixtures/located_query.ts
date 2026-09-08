@@ -14,7 +14,7 @@ export const v = (name: string) => DF.variable(name);
 export const c = (name: string) => DF.namedNode(`http://example.org/${name}`);
 
 export function tp(
-  location: string,
+  location: string | Iterable<string>,
   subject: string,
   predicate: string,
   object: string,
@@ -23,7 +23,7 @@ export function tp(
     name.startsWith("?") ? v(name.slice(1)) : c(name);
 
   return {
-    location,
+    location: new Set(typeof location === "string" ? [location] : location),
     subject: term(subject),
     predicate: term(predicate),
     object: term(object),

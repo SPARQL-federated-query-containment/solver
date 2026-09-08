@@ -86,6 +86,19 @@ test("only places a pattern on one evaluated at the same member", () => {
   expect(isSubgoalsOnto(subQuery, superQuery)).toBe(false);
 });
 
+test("maps a branch onto one that unions over a wider sub-federation", () => {
+  const narrow = located(`SELECT * WHERE {
+    { SERVICE ex:a { ?s ex:p ?o } } UNION { SERVICE ex:b { ?s ex:p ?o } }
+  }`);
+  const wide = located(`SELECT * WHERE {
+    { SERVICE ex:a { ?s ex:p ?o } } UNION { SERVICE ex:b { ?s ex:p ?o } }
+    UNION { SERVICE ex:c { ?s ex:p ?o } }
+  }`);
+
+  expect(isSubgoalsOnto(narrow, wide)).toBe(true);
+  expect(isSubgoalsOnto(wide, narrow)).toBe(false);
+});
+
 test("covers a federated query against itself", () => {
   const q = located(`SELECT ?s ?b ?j WHERE {
     ?s schema:birthDate ?b .

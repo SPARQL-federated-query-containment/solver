@@ -1,7 +1,12 @@
 import { test, expect } from "bun:test";
 import { isError, isResult } from "result-interface";
 import { locate } from "../lib/located_query";
-import { LOCAL_MEMBER, virtualMember } from "../lib/federation_member";
+import {
+  LOCAL_MEMBER,
+  virtualMember,
+  subFederation,
+  hosts,
+} from "../lib/federation_member";
 
 const PREFIX = "PREFIX ex: <http://example.org/>";
 const REGISTRY = "http://example.org/reg";
@@ -10,13 +15,14 @@ const LIBRARY = "http://example.org/lib";
 const NET_REG =
   "urn:federation:http%3A%2F%2Fexample.org%2Fnet" +
   "_http%3A%2F%2Fexample.org%2Freg";
-const LIB_NET =
-  "urn:federation:http%3A%2F%2Fexample.org%2Flib" +
-  "_http%3A%2F%2Fexample.org%2Fnet";
 const LIB_NET_REG =
   "urn:federation:http%3A%2F%2Fexample.org%2Flib" +
   "_http%3A%2F%2Fexample.org%2Fnet" +
   "_http%3A%2F%2Fexample.org%2Freg";
+
+const netReg = [NETWORK, REGISTRY];
+const libNet = [LIBRARY, NETWORK];
+const libNetReg = [LIBRARY, NETWORK, REGISTRY];
 
 function located(query: string) {
   const form = locate(`${PREFIX} ${query}`);
@@ -29,7 +35,7 @@ function located(query: string) {
     head: form.value.head.map((variable) => variable.value),
     semantics: form.value.semantics,
     body: form.value.body.map((pattern) => [
-      pattern.location,
+      [...pattern.location].sort(),
       pattern.subject.value,
       pattern.predicate.value,
       pattern.object.value,
@@ -75,6 +81,36 @@ test("keeps a member holding the separator from splitting into two", () => {
   );
 });
 
+test("a sub-federation deduplicates and keeps its members", () => {
+  const federation = subFederation([REGISTRY, NETWORK, REGISTRY]);
+
+  if (isError(federation)) {
+    throw federation.error;
+  }
+
+  expect(federation.value).toEqual(new Set([REGISTRY, NETWORK]));
+});
+
+test("a sub-federation holds at least one member", () => {
+  const federation = subFederation([]);
+
+  expect(isError(federation) && federation.error.message).toContain("no member");
+});
+
+test("the local member is never part of a sub-federation", () => {
+  const federation = subFederation([LOCAL_MEMBER, REGISTRY]);
+
+  expect(isError(federation) && federation.error.message).toContain("local");
+});
+
+test("a location hosts another when it covers every member of it", () => {
+  expect(hosts(new Set([REGISTRY, NETWORK]), new Set([REGISTRY]))).toBe(true);
+  expect(hosts(new Set([REGISTRY, NETWORK]), new Set([REGISTRY, NETWORK]))).toBe(
+    true,
+  );
+  expect(hosts(new Set([REGISTRY]), new Set([REGISTRY, NETWORK]))).toBe(false);
+});
+
 test("reduces a union to its pattern at the virtual member of its branches", () => {
   expect(
     located(`SELECT ?s WHERE {
@@ -85,7 +121,7 @@ test("reduces a union to its pattern at the virtual member of its branches", () 
   ).toEqual({
     head: ["s"],
     semantics: "bag",
-    body: [[NET_REG, "s", "http://example.org/job", "j"]],
+    body: [[netReg, "s", "http://example.org/job", "j"]],
   });
 });
 
@@ -104,8 +140,8 @@ test("reduces the two unions of an exhaustive source assignment", () => {
     head: ["b", "j", "s"],
     semantics: "bag",
     body: [
-      [NET_REG, "s", "http://example.org/job", "j"],
-      [NET_REG, "s", "http://example.org/birthday", "b"],
+      [netReg, "s", "http://example.org/job", "j"],
+      [netReg, "s", "http://example.org/birthday", "b"],
     ],
   });
 });
@@ -122,7 +158,7 @@ test("reduces a union over three members to one virtual member", () => {
   ).toEqual({
     head: ["s"],
     semantics: "bag",
-    body: [[LIB_NET_REG, "s", "http://example.org/job", "j"]],
+    body: [[libNetReg, "s", "http://example.org/job", "j"]],
   });
 });
 
@@ -150,11 +186,11 @@ test("locates each conjunct at its member, whatever its sub-federation", () => {
     head: ["s"],
     semantics: "bag",
     body: [
-      [LOCAL_MEMBER, "s", "http://example.org/name", "n"],
-      [REGISTRY, "s", "http://example.org/city", "c"],
-      [LIB_NET_REG, "s", "http://example.org/job", "j"],
-      [NET_REG, "s", "http://example.org/age", "a"],
-      [LIB_NET, "s", "http://example.org/phone", "p"],
+      [[LOCAL_MEMBER], "s", "http://example.org/name", "n"],
+      [[REGISTRY], "s", "http://example.org/city", "c"],
+      [libNetReg, "s", "http://example.org/job", "j"],
+      [netReg, "s", "http://example.org/age", "a"],
+      [libNet, "s", "http://example.org/phone", "p"],
     ],
   });
 });
@@ -169,7 +205,7 @@ test("reads a union repeating one member under bag-set semantics", () => {
   ).toEqual({
     head: ["s", "j"],
     semantics: "bag-set",
-    body: [[REGISTRY, "s", "http://example.org/job", "j"]],
+    body: [[[REGISTRY], "s", "http://example.org/job", "j"]],
   });
 });
 
@@ -189,7 +225,7 @@ test("accepts branches naming a variable local to the union differently", () => 
   ).toEqual({
     head: ["s"],
     semantics: "bag",
-    body: [[NET_REG, "s", "http://example.org/job", "j"]],
+    body: [[netReg, "s", "http://example.org/job", "j"]],
   });
 });
 
