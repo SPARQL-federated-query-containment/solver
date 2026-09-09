@@ -1,11 +1,15 @@
 import type * as RDF from "@rdfjs/types";
 
-/** A triple pattern extended with the sub-federation evaluating it. */
-export interface LocatedTriplePattern {
-  location: Set<string>;
+/** A triple pattern, before a source selection says where it is evaluated. */
+export interface TriplePattern {
   subject: RDF.Term;
   predicate: RDF.Term;
   object: RDF.Term;
+}
+
+/** A triple pattern extended with the sub-federation evaluating it. */
+export interface LocatedTriplePattern extends TriplePattern {
+  location: Set<string>;
 }
 
 export type Semantics = "bag-set" | "bag";
