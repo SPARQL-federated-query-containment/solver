@@ -1,6 +1,6 @@
 import { test, expect } from "bun:test";
 import { isError } from "result-interface";
-import { isSubgoalsOnto } from "../lib/subgoals_onto";
+import { coversEveryDuplicate, isSubgoalsOnto } from "../lib/subgoals_onto";
 import { locate } from "../lib/located_query";
 
 const PREFIX = `PREFIX schema: <http://schema.org/> PREFIX ex: <http://example.org/>`;
@@ -69,7 +69,9 @@ test("holds a distinguished variable to itself", () => {
 });
 
 test("refuses a constant facing a different constant", () => {
-  const superQuery = located(`SELECT ?s WHERE { ?s schema:jobTitle "cashier" }`);
+  const superQuery = located(
+    `SELECT ?s WHERE { ?s schema:jobTitle "cashier" }`,
+  );
   const subQuery = located(`SELECT ?s WHERE { ?s schema:jobTitle "barista" }`);
 
   expect(isSubgoalsOnto(subQuery, superQuery)).toBe(false);
@@ -119,4 +121,51 @@ test("backtracks onto the placement that covers every conjunct", () => {
   }`);
 
   expect(isSubgoalsOnto(subQuery, superQuery)).toBe(true);
+});
+
+const OVER_A_BKG = located(`SELECT ?x ?y WHERE {
+  { SERVICE ex:a { ?x ex:p ?y } } UNION { SERVICE ex:b { ?x ex:p ?y } }
+}`);
+
+test("a conjunct read at one member needs no conjunct answering for it", () => {
+  const filtered = located(`SELECT ?x ?y WHERE {
+    { SERVICE ex:a { ?x ex:p ?y } } UNION { SERVICE ex:b { ?x ex:p ?y } }
+    SERVICE ex:a { ?x ex:q ?y }
+  }`);
+
+  // Its member holds a set, so it returns its triple once and duplicates
+  // nothing, though nothing of the containing query is placed on it.
+  expect(isSubgoalsOnto(filtered, OVER_A_BKG)).toBe(false);
+  expect(coversEveryDuplicate(filtered, OVER_A_BKG)).toBe(true);
+});
+
+test("a conjunct read over a BKG still needs one, as it duplicates", () => {
+  const duplicating = located(`SELECT ?x ?y WHERE {
+    { SERVICE ex:a { ?x ex:p ?y } } UNION { SERVICE ex:b { ?x ex:p ?y } }
+    { SERVICE ex:a { ?x ex:q ?y } } UNION { SERVICE ex:b { ?x ex:q ?y } }
+  }`);
+
+  expect(coversEveryDuplicate(duplicating, OVER_A_BKG)).toBe(false);
+});
+
+test("no conjunct duplicating leaves only the mapping to find", () => {
+  const subQuery = located(`SELECT ?x ?y WHERE {
+    SERVICE ex:a { ?x ex:p ?y }
+    SERVICE ex:a { ?x ex:q ?y }
+  }`);
+  const superQuery = located(
+    `SELECT ?x ?y WHERE { SERVICE ex:a { ?x ex:p ?y } }`,
+  );
+
+  expect(coversEveryDuplicate(subQuery, superQuery)).toBe(true);
+  expect(coversEveryDuplicate(superQuery, subQuery)).toBe(false);
+});
+
+test("a query answers for itself, every conjunct being covered by its own", () => {
+  const q = located(`SELECT ?x ?y WHERE {
+    { SERVICE ex:a { ?x ex:p ?y } } UNION { SERVICE ex:b { ?x ex:p ?y } }
+  }`);
+
+  expect(coversEveryDuplicate(q, q)).toBe(true);
+  expect(isSubgoalsOnto(q, q)).toBe(true);
 });

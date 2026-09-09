@@ -179,3 +179,45 @@ test("carries an error of the solver to the caller", async () => {
 
   expect(isError(answer)).toBe(true);
 });
+
+/** One clause read over a BKG, which is what makes the pair a bag one. */
+const OVER_A_BKG = `{ SERVICE ex:a { ?x ex:p ?y } } UNION { SERVICE ex:b { ?x ex:p ?y } }`;
+
+test("a conjunct read at one member does not rule out containment", async () => {
+  // It is evaluated over that member's graph, a set, so it filters the
+  // solutions of the contained query without duplicating any of them.
+  const subQuery = located(`SELECT ?x ?y WHERE {
+    ${OVER_A_BKG}
+    SERVICE ex:a { ?x ex:q ?y }
+  }`);
+  const superQuery = located(`SELECT ?x ?y WHERE { ${OVER_A_BKG} }`);
+
+  expect(
+    await decideUcfqContainment(subQuery, superQuery, setSolver(true).decide),
+  ).toEqual(result("contained"));
+});
+
+test("a conjunct read over a BKG does rule it out, as it duplicates", async () => {
+  const subQuery = located(`SELECT ?x ?y WHERE {
+    ${OVER_A_BKG}
+    { SERVICE ex:a { ?x ex:q ?y } } UNION { SERVICE ex:b { ?x ex:q ?y } }
+  }`);
+  const superQuery = located(`SELECT ?x ?y WHERE { ${OVER_A_BKG} }`);
+
+  expect(
+    await decideUcfqContainment(subQuery, superQuery, setSolver(true).decide),
+  ).toEqual(result("not contained"));
+});
+
+test("the containing query still has to answer for every solution", async () => {
+  // Its clause reads another predicate, so no mapping places it at all and no
+  // conjunct being duplicating makes up for that.
+  const subQuery = located(`SELECT ?x ?y WHERE { ${OVER_A_BKG} }`);
+  const superQuery = located(`SELECT ?x ?y WHERE {
+    { SERVICE ex:a { ?x ex:other ?y } } UNION { SERVICE ex:b { ?x ex:other ?y } }
+  }`);
+
+  expect(
+    await decideUcfqContainment(subQuery, superQuery, setSolver(true).decide),
+  ).toEqual(result("not contained"));
+});

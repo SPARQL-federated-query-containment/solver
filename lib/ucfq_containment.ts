@@ -4,7 +4,7 @@ import {
   sameHead,
   type LocatedQuery,
 } from "./containment_mapping";
-import { isSubgoalsOnto } from "./subgoals_onto";
+import { coversEveryDuplicate, isSubgoalsOnto } from "./subgoals_onto";
 import type { Containment } from "./federated_containment";
 import type { SetContainmentSolver } from "./SetContainmentSolver";
 
@@ -26,8 +26,16 @@ export async function decideUcfqContainment(
     return result("contained");
   }
 
+  // A conjunct read at a single member returns a matched triple once, whatever
+  // the rest of the body reads, so it duplicates no solution and the containing
+  // query answers for it without a conjunct of its own. Asking the mapping to
+  // cover it would reject a pair on a located database no federation holds.
   if (isProjectionFree(subQuery) && isProjectionFree(superQuery)) {
-    return result("not contained");
+    return result(
+      coversEveryDuplicate(subQuery, superQuery)
+        ? "contained"
+        : "not contained",
+    );
   }
 
   // A set database is a bag database whose multiplicities are all one, so bag
