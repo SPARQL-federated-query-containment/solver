@@ -30,9 +30,15 @@ export function specsSolver(container: ContainerProcess): SetSolver {
     // "unsat" means the containment holds, "sat" that a counter-model exists.
     switch (answered.value) {
       case "unsat":
-        return result(true);
+        return result("contained");
       case "sat":
-        return result(false);
+        return result("not contained");
+      case "timeout":
+        return result("timeout");
+      case "unknown":
+        return result("set solver unknown");
+      case "out of memory":
+        return result("out of memory");
       default:
         return error(
           new Error(
@@ -48,8 +54,14 @@ export function specsSolver(container: ContainerProcess): SetSolver {
 /** Starts SpeCS and keeps it alive. */
 export async function startSpecs(
   image: string = SPECS_IMAGE,
+  z3TimeoutSeconds?: number,
+  z3MemoryMb?: number,
 ): SafePromise<SetSolver> {
-  const started = await ContainerProcess.start(image);
+  const started = await ContainerProcess.start(
+    image,
+    z3TimeoutSeconds,
+    z3MemoryMb,
+  );
 
   if (isError(started)) {
     return started;

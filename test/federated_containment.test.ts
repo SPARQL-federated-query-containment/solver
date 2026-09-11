@@ -1,7 +1,10 @@
 import { test, expect } from "bun:test";
 import { isError, result, error } from "result-interface";
 import { decideSetContainment } from "../lib/federated_containment";
-import type { SetContainmentSolver } from "../lib/SetContainmentSolver";
+import type {
+  SetContainmentResult,
+  SetContainmentSolver,
+} from "../lib/SetContainmentSolver";
 import { locate } from "../lib/located_query";
 
 const PREFIX = `PREFIX schema: <http://schema.org/> PREFIX ex: <http://example.org/>`;
@@ -17,7 +20,7 @@ function located(sparql: string) {
 }
 
 /** A stand-in solver returning a fixed verdict and counting its calls. */
-function setSolver(verdict: boolean) {
+function setSolver(verdict: SetContainmentResult) {
   const calls = { count: 0 };
 
   const decide: SetContainmentSolver = () => {
@@ -32,14 +35,14 @@ test("rejects a pair whose heads differ", async () => {
   const answer = await decideSetContainment(
     located("SELECT ?s WHERE { ?s schema:birthDate ?b }"),
     located("SELECT ?b WHERE { ?s schema:birthDate ?b }"),
-    setSolver(true).decide,
+    setSolver("contained").decide,
   );
 
   expect(answer).toEqual({ value: "not contained" });
 });
 
 test("rejects on the federation before consulting the solver", async () => {
-  const solver = setSolver(true);
+  const solver = setSolver("contained");
   const answer = await decideSetContainment(
     located("SELECT ?s ?job WHERE { ?s schema:jobTitle ?job }"),
     located(
@@ -53,7 +56,7 @@ test("rejects on the federation before consulting the solver", async () => {
 });
 
 test("rejects on a fresh variable before consulting the solver", async () => {
-  const solver = setSolver(true);
+  const solver = setSolver("contained");
   const answer = await decideSetContainment(
     located(`SELECT ?s ?birthDate WHERE {
       ?s schema:birthDate ?birthDate .
@@ -68,7 +71,7 @@ test("rejects on a fresh variable before consulting the solver", async () => {
 });
 
 test("rejects on the variable count before consulting the solver", async () => {
-  const solver = setSolver(true);
+  const solver = setSolver("contained");
   const answer = await decideSetContainment(
     located(`SELECT ?s WHERE {
       ?s schema:birthDate ?b .
@@ -84,7 +87,7 @@ test("rejects on the variable count before consulting the solver", async () => {
 });
 
 test("decides a projection-free pair without consulting the solver", async () => {
-  const solver = setSolver(false);
+  const solver = setSolver("not contained");
   const answer = await decideSetContainment(
     located(`SELECT ?s ?b WHERE {
       ?s schema:birthDate ?b .
@@ -99,7 +102,7 @@ test("decides a projection-free pair without consulting the solver", async () =>
 });
 
 test("rejects a projection-free pair holding no variable-onto mapping", async () => {
-  const solver = setSolver(true);
+  const solver = setSolver("contained");
   const answer = await decideSetContainment(
     located("SELECT ?s ?b WHERE { ?s schema:jobTitle ?b }"),
     located("SELECT ?s ?b WHERE { ?s schema:birthDate ?b }"),
@@ -118,11 +121,11 @@ test("answers with the solver when only the contained query is projection-free",
   }`);
 
   expect(
-    await decideSetContainment(subQuery, superQuery, setSolver(false).decide),
+    await decideSetContainment(subQuery, superQuery, setSolver("not contained").decide),
   ).toEqual({ value: "not contained" });
 
   expect(
-    await decideSetContainment(subQuery, superQuery, setSolver(true).decide),
+    await decideSetContainment(subQuery, superQuery, setSolver("contained").decide),
   ).toEqual({ value: "contained" });
 });
 
@@ -131,7 +134,7 @@ test("accepts a projecting pair that is set contained and variable-onto", async 
     ?s schema:jobTitle ?x .
     ?s schema:name ?n .
   }`);
-  const solver = setSolver(true);
+  const solver = setSolver("contained");
 
   expect(await decideSetContainment(q, q, solver.decide)).toEqual({
     value: "contained",
@@ -150,7 +153,7 @@ test("answers unknown on a projecting pair that is set contained without a varia
       ?s schema:jobTitle ?y .
       ?s schema:jobTitle ?z .
     }`),
-    setSolver(true).decide,
+    setSolver("contained").decide,
   );
 
   expect(answer).toEqual({ value: "unknown" });
@@ -167,7 +170,7 @@ test("rejects a projecting pair the solver reports as not set contained", async 
       ?s schema:jobTitle ?y .
       ?s schema:jobTitle ?z .
     }`),
-    setSolver(false).decide,
+    setSolver("not contained").decide,
   );
 
   expect(answer).toEqual({ value: "not contained" });

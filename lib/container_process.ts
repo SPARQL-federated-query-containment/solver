@@ -27,15 +27,30 @@ export class ContainerProcess {
     void this.drainStderr();
   }
 
-  static async start(image: string): SafePromise<ContainerProcess> {
+  static async start(
+    image: string,
+    z3TimeoutSeconds?: number,
+    z3MemoryMb?: number,
+  ): SafePromise<ContainerProcess> {
     const built = await ensureDockerImage(image);
 
     if (isError(built)) {
       return built;
     }
 
+    const env: string[] = [];
+    if (z3TimeoutSeconds !== undefined) {
+      env.push("-e", `SPECS_Z3_TIMEOUT=${z3TimeoutSeconds}`);
+    }
+    if (z3MemoryMb !== undefined) {
+      env.push("-e", `SPECS_Z3_MEMORY=${z3MemoryMb}`);
+    }
+
     return result(
-      ContainerProcess.spawn(["docker", "run", "--rm", "-i", image], image),
+      ContainerProcess.spawn(
+        ["docker", "run", "--rm", "-i", ...env, image],
+        image,
+      ),
     );
   }
 

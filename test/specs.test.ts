@@ -46,7 +46,7 @@ async function contained(subQuery: string, superQuery: string) {
 test("reports a query as contained in itself", async () => {
   const query = "SELECT ?s WHERE { ?s ex:job ?j }";
 
-  expect(await contained(query, query)).toBe(true);
+  expect(await contained(query, query)).toBe("contained");
 });
 
 test("reports a query holding an extra pattern as contained", async () => {
@@ -55,7 +55,7 @@ test("reports a query holding an extra pattern as contained", async () => {
       "SELECT ?s WHERE { ?s ex:job ?j . ?s ex:name ?n }",
       "SELECT ?s WHERE { ?s ex:job ?j }",
     ),
-  ).toBe(true);
+  ).toBe("contained");
 });
 
 test("reports a query missing a pattern as not contained", async () => {
@@ -64,7 +64,7 @@ test("reports a query missing a pattern as not contained", async () => {
       "SELECT ?s WHERE { ?s ex:job ?j }",
       "SELECT ?s WHERE { ?s ex:job ?j . ?s ex:name ?n }",
     ),
-  ).toBe(false);
+  ).toBe("not contained");
 });
 
 test("reads the member each pattern is evaluated at", async () => {
@@ -73,19 +73,19 @@ test("reads the member each pattern is evaluated at", async () => {
       "SELECT ?s ?j WHERE { SERVICE ex:reg { ?s ex:job ?j } }",
       "SELECT ?s ?j WHERE { SERVICE ex:net { ?s ex:job ?j } }",
     ),
-  ).toBe(false);
+  ).toBe("not contained");
 });
 
 test("decides a pair holding a typed literal", async () => {
   const query = `SELECT ?s WHERE { ?s ex:age 42 }`;
 
-  expect(await contained(query, query)).toBe(true);
+  expect(await contained(query, query)).toBe("contained");
 });
 
 test("decides a pair holding a literal with a language tag", async () => {
   const query = `SELECT ?s WHERE { ?s ex:name "jan"@en }`;
 
-  expect(await contained(query, query)).toBe(true);
+  expect(await contained(query, query)).toBe("contained");
 });
 
 test("keeps a literal apart from another of a different datatype", async () => {
@@ -94,17 +94,17 @@ test("keeps a literal apart from another of a different datatype", async () => {
       `SELECT ?s WHERE { ?s ex:age "42" }`,
       `SELECT ?s WHERE { ?s ex:age 42 }`,
     ),
-  ).toBe(false);
+  ).toBe("not contained");
 });
 
 test("answers several pairs on the one process", async () => {
   const query = "SELECT ?s WHERE { ?s ex:job ?j }";
 
-  expect(await contained(query, query)).toBe(true);
+  expect(await contained(query, query)).toBe("contained");
   expect(
     await contained(query, "SELECT ?s WHERE { ?s ex:name ?n }"),
-  ).toBe(false);
-  expect(await contained(query, query)).toBe(true);
+  ).toBe("not contained");
+  expect(await contained(query, query)).toBe("contained");
 });
 
 const ECHO = `${import.meta.dir}/fixtures/echo_solver.ts`;

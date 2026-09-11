@@ -1,11 +1,18 @@
 import type { SafePromise } from "result-interface";
 import type { LocatedQuery } from "./containment_mapping";
 
+export type SetContainmentResult =
+  | "contained"
+  | "not contained"
+  | "timeout"
+  | "set solver unknown"
+  | "out of memory";
+
 /** Decides set containment of two located queries. */
 export type SetContainmentSolver = (
   subQuery: LocatedQuery,
   superQuery: LocatedQuery,
-) => SafePromise<boolean>;
+) => SafePromise<SetContainmentResult>;
 
 /** A set containment solver kept alive across calls. */
 export interface SetSolver {

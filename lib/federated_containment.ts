@@ -12,7 +12,13 @@ import {
 import { isVariableOnto } from "./variable_onto";
 import type { SetContainmentSolver } from "./SetContainmentSolver";
 
-export type Containment = "contained" | "not contained" | "unknown";
+export type Containment =
+  | "contained"
+  | "not contained"
+  | "unknown"
+  | "timeout"
+  | "set solver unknown"
+  | "out of memory";
 
 /**
  * Decides whether the contained query is contained in the containing one under
@@ -52,7 +58,11 @@ export async function decideSetContainment(
     return setContainmentResult;
   }
 
-  if (!setContainmentResult.value) {
+  if (setContainmentResult.value !== "contained" && setContainmentResult.value !== "not contained") {
+    return result(setContainmentResult.value);
+  }
+
+  if (setContainmentResult.value === "not contained") {
     return result("not contained");
   }
 

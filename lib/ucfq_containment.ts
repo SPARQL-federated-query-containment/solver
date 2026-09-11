@@ -46,5 +46,9 @@ export async function decideUcfqContainment(
     return setContainmentResult;
   }
 
-  return result(setContainmentResult.value ? "unknown" : "not contained");
+  if (setContainmentResult.value !== "contained" && setContainmentResult.value !== "not contained") {
+    return result(setContainmentResult.value);
+  }
+
+  return result(setContainmentResult.value === "contained" ? "unknown" : "not contained");
 }
