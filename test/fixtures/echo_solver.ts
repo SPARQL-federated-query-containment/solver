@@ -14,16 +14,9 @@ for await (const line of console) {
     case "unframed":
       console.log("what?");
       break;
-    case "complain":
+    case "crash":
       console.error(rest.join(" "));
-      console.log(`OK ${encode("")}`);
-      break;
-    case "die":
       process.exit(0);
-      break;
-    case "slow":
-      await Bun.sleep(Number(rest[0]));
-      console.log(`OK ${encode(rest.slice(1).join(" "))}`);
       break;
     default:
       console.log(`OK ${encode(fields.join("|"))}`);

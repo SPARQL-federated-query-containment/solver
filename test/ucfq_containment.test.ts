@@ -3,9 +3,9 @@ import { isError, result, error } from "result-interface";
 import { decideUcfqContainment } from "../lib/ucfq_containment";
 import { locate } from "../lib/located_query";
 import type {
-  SetContainmentResult,
-  SetContainmentSolver,
-} from "../lib/SetContainmentSolver";
+  ContainmentResult,
+  ContainmentSolver,
+} from "../lib/containment_solver";
 
 const PREFIX = `PREFIX schema: <http://schema.org/> PREFIX ex: <http://example.org/>`;
 
@@ -19,10 +19,10 @@ function located(sparql: string) {
   return form.value;
 }
 
-function setSolver(verdict: SetContainmentResult) {
+function setSolver(verdict: ContainmentResult) {
   const calls = { count: 0 };
 
-  const decide: SetContainmentSolver = () => {
+  const decide: ContainmentSolver = () => {
     calls.count += 1;
     return Promise.resolve(result(verdict));
   };
@@ -155,7 +155,7 @@ test("rejects a projecting pair the solver reports as not set contained", async 
 });
 
 test("carries an error of the solver to the caller", async () => {
-  const failing: SetContainmentSolver = () =>
+  const failing: ContainmentSolver = () =>
     Promise.resolve(error(new Error("z3 is not executable")));
 
   const answer = await decideUcfqContainment(

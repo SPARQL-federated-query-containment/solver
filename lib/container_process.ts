@@ -1,147 +1,75 @@
-import type { ReadableStreamDefaultReader } from "node:stream/web";
 import { type SafePromise, result, error, isError } from "result-interface";
 import { ensureDockerImage } from "./util";
 
 const encode = (field: string) => Buffer.from(field, "utf8").toString("base64");
 const decode = (field: string) => Buffer.from(field, "base64").toString("utf8");
 
-/**
- * A solver kept alive in a container, one request per line on stdin and one
- * response per line on stdout, with base64 fields so that a multi-line SPARQL
- * query survives the framing.
- */
-type Piped = Bun.Subprocess<"pipe", "pipe", "pipe">;
+export interface ContainerOptions {
+  z3TimeoutSeconds?: number;
+  z3MemoryMb?: number;
+  name?: string;
+}
 
-export class ContainerProcess {
-  private stdout: ReadableStreamDefaultReader<Uint8Array<ArrayBuffer>>;
-  private decoder = new TextDecoder();
-  private pending = "";
-  private diagnostics = "";
-  private queue: Promise<unknown> = Promise.resolve();
+export async function runCommand(
+  command: string[],
+  name: string,
+  fields: string[],
+): SafePromise<string> {
+  const proc = Bun.spawn(command, {
+    stdin: "pipe",
+    stdout: "pipe",
+    stderr: "pipe",
+  });
 
-  private constructor(
-    private readonly image: string,
-    private readonly proc: Piped,
-  ) {
-    this.stdout = proc.stdout.getReader();
-    void this.drainStderr();
+  await proc.stdin.write(`${fields.map(encode).join(" ")}\n`);
+  await proc.stdin.end();
+
+  const [stdout, stderr] = await Promise.all([
+    new Response(proc.stdout).text(),
+    new Response(proc.stderr).text(),
+  ]);
+  await proc.exited;
+
+  if (stdout.length === 0) {
+    return error(new Error(`${name} closed its output:\n${stderr.trim()}`));
   }
 
-  static async start(
-    image: string,
-    z3TimeoutSeconds?: number,
-    z3MemoryMb?: number,
-  ): SafePromise<ContainerProcess> {
-    const built = await ensureDockerImage(image);
+  const line = stdout.split("\n", 1)[0] ?? "";
+  const [status, payload] = line.split(" ", 2);
 
-    if (isError(built)) {
-      return built;
-    }
-
-    const env: string[] = [];
-    if (z3TimeoutSeconds !== undefined) {
-      env.push("-e", `SPECS_Z3_TIMEOUT=${z3TimeoutSeconds}`);
-    }
-    if (z3MemoryMb !== undefined) {
-      env.push("-e", `SPECS_Z3_MEMORY=${z3MemoryMb}`);
-    }
-
-    return result(
-      ContainerProcess.spawn(
-        ["docker", "run", "--rm", "-i", ...env, image],
-        image,
-      ),
-    );
-  }
-
-  // Any command speaking the protocol, which lets the protocol be tested
-  // without a container.
-  static spawn(command: string[], name: string): ContainerProcess {
-    const proc = Bun.spawn(command, {
-      stdin: "pipe",
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-
-    return new ContainerProcess(name, proc);
-  }
-
-  // Serialised: specs writes formula.smt into its working directory, so
-  // parallel requests to one process would race on it.
-  request(...fields: string[]): SafePromise<string> {
-    const answered = this.queue.then(() => this.exchange(fields));
-    this.queue = answered.then(
-      () => undefined,
-      () => undefined,
-    );
-    return answered;
-  }
-
-  async close(): Promise<void> {
-    await this.proc.stdin.end();
-    this.proc.kill();
-    await this.proc.exited;
-  }
-
-  private async exchange(fields: string[]): SafePromise<string> {
-    await this.proc.stdin.write(`${fields.map(encode).join(" ")}\n`);
-    await this.proc.stdin.flush();
-
-    const line = await this.readLine();
-
-    if (line === null) {
+  switch (status) {
+    case "OK":
+      return result(decode(payload ?? ""));
+    case "ERR":
+      return error(Error(`${name}: ${decode(payload ?? "")}`));
+    default:
       return error(
-        Error(`${this.image} closed its output:\n${this.diagnostics.trim()}`),
+        Error(`${name} produced an unframed response: "${line}"`),
       );
-    }
+  }
+}
 
-    const [status, payload] = line.split(" ", 2);
+export async function runContainer(
+  image: string,
+  fields: string[],
+  options: ContainerOptions = {},
+): SafePromise<string> {
+  const built = await ensureDockerImage(image);
 
-    switch (status) {
-      case "OK":
-        return result(decode(payload ?? ""));
-      case "ERR":
-        return error(Error(`${this.image}: ${decode(payload ?? "")}`));
-      default:
-        return error(
-          Error(`${this.image} produced an unframed response: "${line}"`),
-        );
-    }
+  if (isError(built)) {
+    return built;
   }
 
-  private async readLine(): Promise<string | null> {
-    for (;;) {
-      const end = this.pending.indexOf("\n");
-
-      if (end !== -1) {
-        const line = this.pending.slice(0, end);
-        this.pending = this.pending.slice(end + 1);
-        return line;
-      }
-
-      const { done, value } = await this.stdout.read();
-
-      if (done) {
-        return null;
-      }
-
-      this.pending += this.decoder.decode(value, { stream: true });
-    }
+  const env: string[] = [];
+  if (options.z3TimeoutSeconds !== undefined) {
+    env.push("-e", `SPECS_Z3_TIMEOUT=${options.z3TimeoutSeconds.toFixed()}`);
+  }
+  if (options.z3MemoryMb !== undefined) {
+    env.push("-e", `SPECS_Z3_MEMORY=${options.z3MemoryMb.toFixed()}`);
+  }
+  if (options.name !== undefined) {
+    env.push("--name", options.name);
   }
 
-  // Left undrained, the stderr pipe fills and blocks the container. Diagnostics
-  // are best-effort, so a broken stream must not reject into the caller.
-  private async drainStderr(): Promise<void> {
-    const decoder = new TextDecoder();
-
-    try {
-      for await (const chunk of this.proc.stderr) {
-        this.diagnostics = (
-          this.diagnostics + decoder.decode(chunk, { stream: true })
-        ).slice(-4096);
-      }
-    } catch {
-      this.diagnostics = `${this.diagnostics}\n${this.image} closed its diagnostics`;
-    }
-  }
+  return runCommand(["docker", "run", "--rm", "-i", ...env, image], image, fields);
 }

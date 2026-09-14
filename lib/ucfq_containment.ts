@@ -5,8 +5,7 @@ import {
   type LocatedQuery,
 } from "./containment_mapping";
 import { coversEveryDuplicate, isSubgoalsOnto } from "./subgoals_onto";
-import type { Containment } from "./federated_containment";
-import type { SetContainmentSolver } from "./SetContainmentSolver";
+import type { ContainmentResult, ContainmentSolver } from "./containment_solver";
 
 /**
  * Decides whether the contained query is contained in the containing one under
@@ -16,8 +15,8 @@ import type { SetContainmentSolver } from "./SetContainmentSolver";
 export async function decideUcfqContainment(
   subQuery: LocatedQuery,
   superQuery: LocatedQuery,
-  setContained: SetContainmentSolver,
-): SafePromise<Containment> {
+  setContained: ContainmentSolver,
+): SafePromise<ContainmentResult> {
   if (!sameHead(subQuery, superQuery)) {
     return result("not contained");
   }

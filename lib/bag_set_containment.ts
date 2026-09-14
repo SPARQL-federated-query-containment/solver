@@ -10,26 +10,18 @@ import {
   extraMembersBindNoFreshVariable,
 } from "./federation_conditions";
 import { isVariableOnto } from "./variable_onto";
-import type { SetContainmentSolver } from "./SetContainmentSolver";
-
-export type Containment =
-  | "contained"
-  | "not contained"
-  | "unknown"
-  | "timeout"
-  | "set solver unknown"
-  | "out of memory";
+import type { ContainmentResult, ContainmentSolver } from "./containment_solver";
 
 /**
  * Decides whether the contained query is contained in the containing one under
  * bag-set semantics, in stages of increasing cost, and answers unknown on the
  * fragment where the problem is open.
  */
-export async function decideSetContainment(
+export async function decideBagSetContainment(
   subQuery: LocatedQuery,
   superQuery: LocatedQuery,
-  setContained: SetContainmentSolver,
-): SafePromise<Containment> {
+  setContained: ContainmentSolver,
+): SafePromise<ContainmentResult> {
   if (!sameHead(subQuery, superQuery)) {
     return result("not contained");
   }

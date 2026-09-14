@@ -1,27 +1,9 @@
-import { test, expect, beforeAll, afterAll } from "bun:test";
+import { test, expect } from "bun:test";
 import { isError } from "result-interface";
-import { specsSolver, startSpecs } from "../lib/specs";
-import { ContainerProcess } from "../lib/container_process";
+import { specsIsContained, specsVerdictOf } from "../lib/specs";
 import { locate } from "../lib/located_query";
-import type { SetSolver } from "../lib/SetContainmentSolver";
 
 const PREFIX = "PREFIX ex: <http://example.org/>";
-
-let specs: SetSolver;
-
-beforeAll(async () => {
-  const started = await startSpecs();
-
-  if (isError(started)) {
-    throw started.error;
-  }
-
-  specs = started.value;
-});
-
-afterAll(async () => {
-  await specs.close();
-});
 
 function located(query: string) {
   const form = locate(`${PREFIX} ${query}`);
@@ -34,7 +16,7 @@ function located(query: string) {
 }
 
 async function contained(subQuery: string, superQuery: string) {
-  const answer = await specs.isContained(located(subQuery), located(superQuery));
+  const answer = await specsIsContained(located(subQuery), located(superQuery));
 
   if (isError(answer)) {
     throw answer.error;
@@ -97,45 +79,8 @@ test("keeps a literal apart from another of a different datatype", async () => {
   ).toBe("not contained");
 });
 
-test("answers several pairs on the one process", async () => {
-  const query = "SELECT ?s WHERE { ?s ex:job ?j }";
-
-  expect(await contained(query, query)).toBe("contained");
-  expect(
-    await contained(query, "SELECT ?s WHERE { ?s ex:name ?n }"),
-  ).toBe("not contained");
-  expect(await contained(query, query)).toBe("contained");
-});
-
-const ECHO = `${import.meta.dir}/fixtures/echo_solver.ts`;
-
-/** A stand-in container answering with whatever it was asked. */
-function echoing() {
-  return specsSolver(ContainerProcess.spawn(["bun", ECHO], "echo"));
-}
-
-test("reports a verdict it does not recognise", async () => {
-  const echo = echoing();
-  const query = located("SELECT ?s WHERE { ?s ex:job ?j }");
-
-  const answer = await echo.isContained(query, query);
-  await echo.close();
+test("reports a verdict it does not recognise", () => {
+  const answer = specsVerdictOf("nonsense");
 
   expect(isError(answer)).toBe(true);
-});
-
-test("reports a container that answers nothing", async () => {
-  const dead = specsSolver(
-    ContainerProcess.spawn(["bun", "-e", "process.exit(0)"], "dead"),
-  );
-  const query = located("SELECT ?s WHERE { ?s ex:job ?j }");
-
-  const answer = await dead.isContained(query, query);
-  await dead.close();
-
-  expect(isError(answer)).toBe(true);
-});
-
-test("reports an image it can neither find nor build", async () => {
-  expect(isError(await startSpecs("no-such-image-for-a-test"))).toBe(true);
 });
