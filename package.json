@@ -13,7 +13,7 @@
     "@traqula/generator-sparql-1-1": "^1.2.0",
     "@traqula/parser-sparql-1-1": "^1.2.0",
     "commander": "^15.0.0",
-    "result-interface": "^2.3.3"
+    "result-interface": "^2.5.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

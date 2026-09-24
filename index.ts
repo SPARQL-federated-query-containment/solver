@@ -27,8 +27,8 @@ program
     "--federation-super <members>",
     "comma separated federation the superquery is evaluated over",
   )
-  .option("--z3-timeout <seconds>", "z3 timeout inside the SpeCS oracle", Number)
-  .option("--z3-memory <mb>", "z3 virtual memory limit inside the SpeCS oracle", Number)
+  .option("--z3-timeout <seconds>", "z3 timeout inside the SpeCS", Number)
+  .option("--z3-memory <mb>", "z3 virtual memory limit inside the SpeCS", Number)
   .option("--engine <bfc|specs>", "bfc, the bag-set engine, or specs, the set engine, directly", "bfc")
   .version("0.0.0");
 
