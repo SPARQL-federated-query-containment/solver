@@ -61,7 +61,7 @@ test("accepts a UCFQ against itself without consulting the solver", async () => 
 });
 
 test("rejects a UCFQ pair reading a pattern at another sub-federation", async () => {
-  const solver = setSolver("contained");
+  const solver = setSolver("not contained");
   const subQuery = located(`SELECT ?s ?job WHERE {
     { SERVICE ex:jobRegistry { ?s schema:jobTitle ?job } }
     UNION
@@ -76,10 +76,10 @@ test("rejects a UCFQ pair reading a pattern at another sub-federation", async ()
   expect(
     await decideUcfqContainment(subQuery, superQuery, solver.decide),
   ).toEqual({ value: "not contained" });
-  expect(solver.calls.count).toBe(0);
+  expect(solver.calls.count).toBe(1);
 });
 
-test("rejects an extra conjunct the bag can duplicate, which bag-set semantics accepts", async () => {
+test("leaves unknown an extra conjunct the bag can duplicate, which set containment accepts", async () => {
   const solver = setSolver("contained");
   const subQuery = located(`SELECT ?s ?j WHERE {
     { SERVICE ex:jobRegistry { ?s schema:jobTitle ?j } }
@@ -98,8 +98,8 @@ test("rejects an extra conjunct the bag can duplicate, which bag-set semantics a
 
   expect(
     await decideUcfqContainment(subQuery, superQuery, solver.decide),
-  ).toEqual({ value: "not contained" });
-  expect(solver.calls.count).toBe(0);
+  ).toEqual({ value: "unknown" });
+  expect(solver.calls.count).toBe(1);
 });
 
 test("answers unknown on a projecting pair the solver reports as set contained", async () => {
@@ -200,7 +200,7 @@ test("a conjunct read at one member does not rule out containment", async () => 
   ).toEqual(result("contained"));
 });
 
-test("a conjunct read over a BKG does rule it out, as it duplicates", async () => {
+test("a conjunct read over a BKG needs a cover, as it may duplicate", async () => {
   const subQuery = located(`SELECT ?x ?y WHERE {
     ${OVER_A_BKG}
     { SERVICE ex:a { ?x ex:q ?y } } UNION { SERVICE ex:b { ?x ex:q ?y } }
@@ -209,7 +209,37 @@ test("a conjunct read over a BKG does rule it out, as it duplicates", async () =
 
   expect(
     await decideUcfqContainment(subQuery, superQuery, setSolver("contained").decide),
-  ).toEqual(result("not contained"));
+  ).toEqual(result("unknown"));
+});
+
+test("accepts the example of the paper without a subgoals-onto mapping", async () => {
+  // Section 6.2 of https://github.com/constraintAutomaton/Bag-Semantics-and-Query-Containment-in-SPARQL-Federation
+  const subQuery = located(`SELECT * WHERE {
+    ${OVER_A_BKG}
+    SERVICE ex:c { ?x ex:q ?y }
+  }`);
+  const superQuery = located(`SELECT * WHERE { ${OVER_A_BKG} }`);
+
+  expect(
+    await decideUcfqContainment(subQuery, superQuery, setSolver("contained").decide),
+  ).toEqual(result("contained"));
+});
+
+test("answers unknown, not 'not contained', when sub-federations overlap", async () => {
+  // Contained, as (a + b) * c <= (a + c) * (b + c) for the members holding the
+  // triple, yet no conjunct of the containing query covers the one at {a, b}.
+  const subQuery = located(`SELECT * WHERE {
+    ${OVER_A_BKG}
+    SERVICE ex:c { ?x ex:p ?y }
+  }`);
+  const superQuery = located(`SELECT * WHERE {
+    { SERVICE ex:a { ?x ex:p ?y } } UNION { SERVICE ex:c { ?x ex:p ?y } }
+    { SERVICE ex:b { ?x ex:p ?y } } UNION { SERVICE ex:c { ?x ex:p ?y } }
+  }`);
+
+  expect(
+    await decideUcfqContainment(subQuery, superQuery, setSolver("contained").decide),
+  ).toEqual(result("unknown"));
 });
 
 test("the containing query still has to answer for every solution", async () => {
@@ -221,6 +251,6 @@ test("the containing query still has to answer for every solution", async () => 
   }`);
 
   expect(
-    await decideUcfqContainment(subQuery, superQuery, setSolver("contained").decide),
+    await decideUcfqContainment(subQuery, superQuery, setSolver("not contained").decide),
   ).toEqual(result("not contained"));
 });

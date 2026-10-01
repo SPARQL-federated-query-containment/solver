@@ -9,8 +9,8 @@ import type { ContainmentResult, ContainmentSolver } from "./containment_solver"
 
 /**
  * Decides whether the contained query is contained in the containing one under
- * bag semantics, the two being the CQs the BFR returns. The answer is exact
- * when both queries are projection-free, and sufficient otherwise.
+ * bag semantics, the two being the CQs the BFR returns. The mappings are only
+ * sufficient, so a set contained pair without one is unknown.
  */
 export async function decideUcfqContainment(
   subQuery: LocatedQuery,
@@ -25,16 +25,14 @@ export async function decideUcfqContainment(
     return result("contained");
   }
 
-  // A conjunct read at a single member returns a matched triple once, whatever
-  // the rest of the body reads, so it duplicates no solution and the containing
-  // query answers for it without a conjunct of its own. Asking the mapping to
-  // cover it would reject a pair on a located database no federation holds.
-  if (isProjectionFree(subQuery) && isProjectionFree(superQuery)) {
-    return result(
-      coversEveryDuplicate(subQuery, superQuery)
-        ? "contained"
-        : "not contained",
-    );
+  // A conjunct read at a single member is a set, so it needs no cover. The test
+  // is only sufficient, so its failure falls through to set containment.
+  if (
+    isProjectionFree(subQuery) &&
+    isProjectionFree(superQuery) &&
+    coversEveryDuplicate(subQuery, superQuery)
+  ) {
+    return result("contained");
   }
 
   // A set database is a bag database whose multiplicities are all one, so bag
