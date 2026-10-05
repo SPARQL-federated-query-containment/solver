@@ -1,6 +1,7 @@
 import { test, expect } from "bun:test";
 import { isError, isResult } from "result-interface";
 import { locate, toSparql } from "../lib/located_query";
+import { assign } from "../lib/util_cli";
 import { LOCAL_MEMBER } from "../lib/federation_member";
 
 const PREFIX = "PREFIX ex: <http://example.org/>";
@@ -285,6 +286,83 @@ test("writes each member as a named graph", () => {
   }
   GRAPH <${REGISTRY}> {
     ?s <http://example.org/job> ?j .
+  }
+}`);
+});
+
+test("writes a pattern read at a sub-federation as the union of its members' graphs", () => {
+  expect(
+    sparql(`SELECT * WHERE {
+      { SERVICE ex:a { ?x ex:p ?y } } UNION { SERVICE ex:b { ?x ex:p ?y } }
+    }`),
+  ).toBe(`SELECT ?x ?y WHERE {
+  {
+    GRAPH <http://example.org/a> {
+      ?x <http://example.org/p> ?y .
+    }
+  }
+  UNION {
+    GRAPH <http://example.org/b> {
+      ?x <http://example.org/p> ?y .
+    }
+  }
+}`);
+});
+
+test("writes a query given a federation, as --federation does, like the explicit union", () => {
+  const form = locate(`${PREFIX} SELECT * WHERE { ?x ex:p ?y }`);
+
+  if (isError(form)) {
+    throw form.error;
+  }
+
+  const federated = assign(form.value, "http://example.org/a,http://example.org/b");
+
+  if (isError(federated)) {
+    throw federated.error;
+  }
+
+  expect(toSparql(federated.value)).toBe(`SELECT ?x ?y WHERE {
+  {
+    GRAPH <http://example.org/a> {
+      ?x <http://example.org/p> ?y .
+    }
+  }
+  UNION {
+    GRAPH <http://example.org/b> {
+      ?x <http://example.org/p> ?y .
+    }
+  }
+}`);
+});
+
+test("gives each pattern read at the same sub-federation its own union", () => {
+  // p and q may match at different members, so they cannot share one union.
+  expect(
+    sparql(`SELECT * WHERE {
+      { SERVICE ex:a { ?x ex:p ?y } } UNION { SERVICE ex:b { ?x ex:p ?y } }
+      { SERVICE ex:a { ?x ex:q ?y } } UNION { SERVICE ex:b { ?x ex:q ?y } }
+    }`),
+  ).toBe(`SELECT ?x ?y WHERE {
+  {
+    GRAPH <http://example.org/a> {
+      ?x <http://example.org/p> ?y .
+    }
+  }
+  UNION {
+    GRAPH <http://example.org/b> {
+      ?x <http://example.org/p> ?y .
+    }
+  }
+  {
+    GRAPH <http://example.org/a> {
+      ?x <http://example.org/q> ?y .
+    }
+  }
+  UNION {
+    GRAPH <http://example.org/b> {
+      ?x <http://example.org/q> ?y .
+    }
   }
 }`);
 });

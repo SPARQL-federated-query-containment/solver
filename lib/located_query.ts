@@ -9,7 +9,7 @@ import {
   variablesOf,
   type LocatedQuery,
 } from "./containment_mapping";
-import { LOCAL_MEMBER, virtualMember } from "./federation_member";
+import { LOCAL_MEMBER } from "./federation_member";
 
 type NodeCallBacks = Parameters<typeof algebraUtils.visitOperation>[1];
 
@@ -215,11 +215,14 @@ function asPlainString(term: RDF.Term): RDF.Term {
 }
 
 /**
- * The located query written as SPARQL, each member becoming a named graph, so
- * that a solver deciding set containment can read it.
+ * The located query written as SPARQL, so that a solver deciding set
+ * containment can read it. A member becomes a named graph, and a pattern read
+ * at a sub-federation becomes the union of that pattern over its members'
+ * graphs, whose set semantics is the support of the sub-federation's BKG.
  */
 export function toSparql(query: LocatedQuery): string {
-  const patternsByGraph = new Map<string, Algebra.Pattern[]>();
+  const patternsByMember = new Map<string, Algebra.Pattern[]>();
+  const unions: Algebra.Operation[] = [];
 
   for (const located of query.body) {
     const pattern = FACTORY.createPattern(
@@ -227,35 +230,50 @@ export function toSparql(query: LocatedQuery): string {
       located.predicate,
       asPlainString(located.object),
     );
-    const graph = virtualMember(located.location);
-    const patterns = patternsByGraph.get(graph);
+    const members = Array.from(located.location).sort();
 
-    if (patterns === undefined) {
-      patternsByGraph.set(graph, [pattern]);
+    if (members.length === 1) {
+      const [member] = members as [string];
+      const patterns = patternsByMember.get(member);
+
+      if (patterns === undefined) {
+        patternsByMember.set(member, [pattern]);
+      } else {
+        patterns.push(pattern);
+      }
     } else {
-      patterns.push(pattern);
+      // Each pattern gets its own union: two patterns read at the same
+      // sub-federation may match at different members.
+      unions.push(
+        FACTORY.createUnion(
+          members.map((member) => inGraph([pattern], member)),
+        ),
+      );
     }
   }
 
   const graphs: Algebra.Operation[] = [];
 
-  for (const [graph, patterns] of patternsByGraph) {
-    graphs.push(
-      FACTORY.createGraph(
-        FACTORY.createBgp(patterns),
-        FACTORY.dataFactory.namedNode(graph),
-      ),
-    );
+  for (const [member, patterns] of patternsByMember) {
+    graphs.push(inGraph(patterns, member));
   }
 
-  const [only, ...rest] = graphs;
+  const parts = [...graphs, ...unions];
+  const [only, ...rest] = parts;
   const body =
     only !== undefined && rest.length === 0
       ? only
-      : FACTORY.createJoin(graphs);
+      : FACTORY.createJoin(parts);
   const sparql = GENERATOR.generate(
     toAst(FACTORY.createProject(body, query.head)),
   );
 
   return sparql.replaceAll(STRING_DATATYPE, "");
+}
+
+function inGraph(patterns: Algebra.Pattern[], member: string): Algebra.Operation {
+  return FACTORY.createGraph(
+    FACTORY.createBgp(patterns),
+    FACTORY.dataFactory.namedNode(member),
+  );
 }
